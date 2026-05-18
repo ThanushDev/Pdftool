@@ -1,27 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { jsPDF } from 'jspdf';
 import { PDFDocument } from 'pdf-lib';
 import { renderAsync } from 'docx-preview';
 import html2canvas from 'html2canvas';
 
 export default function LmsConverter() {
-  // Animated background images list
-  const backgrounds = [
-    "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600",
-    "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?q=80&w=1600",
-    "https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?q=80&w=1600"
-  ];
-  
-  const [bgIndex, setBgIndex] = useState(0);
-
-  // Background rotator effect (Every 6 seconds)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setBgIndex((prevIndex) => (prevIndex + 1) % backgrounds.length);
-    }, 6000);
-    return () => clearInterval(interval);
-  }, [backgrounds.length]);
-
   // Separate states for each feature tool
   const [imageFiles, setImageFiles] = useState([]);
   const [wordFiles, setWordFiles] = useState([]);
@@ -38,6 +21,20 @@ export default function LmsConverter() {
   const wordInputRef = useRef(null);
   const pdfInputRef = useRef(null);
   const hiddenRenderRef = useRef(null);
+
+  // Define static array for floating background icons to avoid re-render shifting
+  const backgroundIcons = [
+    { icon: '📄', top: '10%', left: '5%', size: '32px', delay: '0s', duration: '15s' },
+    { icon: '📕', top: '25%', left: '85%', size: '28px', delay: '2s', duration: '18s' },
+    { icon: '📚', top: '70%', left: '8%', size: '35px', delay: '1s', duration: '20s' },
+    { icon: '📸', top: '80%', left: '75%', size: '30px', delay: '3s', duration: '16s' },
+    { icon: '🗜️', top: '45%', left: '90%', size: '26px', delay: '5s', duration: '14s' },
+    { icon: '🎓', top: '15%', left: '70%', size: '34px', delay: '4s', duration: '22s' },
+    { icon: '✏️', top: '55%', left: '4%', size: '24px', delay: '2s', duration: '13s' },
+    { icon: '📁', top: '35%', left: '15%', size: '28px', delay: '6s', duration: '17s' },
+    { icon: '🛠️', top: '90%', left: '40%', size: '25px', delay: '0s', duration: '19s' },
+    { icon: '📝', top: '5%', left: '45%', size: '30px', delay: '7s', duration: '21s' },
+  ];
 
   // Selection Logic
   const handleImageSelect = (e) => {
@@ -71,7 +68,7 @@ export default function LmsConverter() {
     });
   };
 
-  // 1. IMAGE TO PDF WITH ASPECT RATIO FIX
+  // 1. IMAGE TO PDF ENGINE (WITH ASPECT RATIO PROTECTION)
   const processImagesToPdf = async () => {
     if (imageFiles.length === 0) return alert("Please select or capture images first!");
     setLoading(true);
@@ -83,7 +80,6 @@ export default function LmsConverter() {
       if (i > 0) pdf.addPage();
       const base64 = await getBase64(imageFiles[i].rawFile);
       
-      // Load image to compute exact original dimensions
       const img = new Image();
       img.src = base64;
       await new Promise((resolve) => { img.onload = resolve; });
@@ -93,13 +89,11 @@ export default function LmsConverter() {
       let imgWidth = pageWidth;
       let imgHeight = (img.height * imgWidth) / img.width;
 
-      // Adjust scales if image height overflows standard A4
       if (imgHeight > pageHeight) {
         imgHeight = pageHeight;
         imgWidth = (img.width * imgHeight) / img.height;
       }
 
-      // Center alignment math
       const xOffset = (pageWidth - imgWidth) / 2;
       const yOffset = (pageHeight - imgHeight) / 2;
 
@@ -111,7 +105,7 @@ export default function LmsConverter() {
     setStatusText("");
   };
 
-  // 2. WORD TO PDF WITH STREAMLINED SCALING
+  // 2. WORD TO PDF CONVERTER
   const processWordToPdf = async (fileObj) => {
     setLoading(true);
     setStatusText(`Processing document architecture for '${fileObj.name}'...`);
@@ -165,18 +159,48 @@ export default function LmsConverter() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'space-between',
       padding: '20px',
       boxSizing: 'border-box',
-      backgroundImage: `linear-gradient(rgba(10, 10, 18, 0.82), rgba(10, 10, 18, 0.85)), url(${backgrounds[bgIndex]})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      transition: 'background-image 1.5s ease-in-out',
+      backgroundColor: '#0a0a12',
       overflowX: 'hidden'
     }}>
       
-      {/* Container Wrapper */}
-      <div style={{ width: '100%', maxWidth: '750px', display: 'grid', gap: '25px', boxSizing: 'border-box' }}>
+      {/* Dynamic CSS Injection for Floating Animations */}
+      <style>{`
+        @keyframes floatAndDrift {
+          0% { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0.15; }
+          50% { transform: translateY(-25px) translateX(15px) rotate(8deg); opacity: 0.35; }
+          100% { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0.15; }
+        }
+        .floating-bg-icon {
+          position: absolute;
+          user-select: none;
+          pointer-events: none;
+          z-index: 1;
+          animation: floatAndDrift infinite ease-in-out;
+        }
+      `}</style>
+
+      {/* Floating Background Icons Layer */}
+      {backgroundIcons.map((item, idx) => (
+        <div
+          key={idx}
+          className="floating-bg-icon"
+          style={{
+            top: item.top,
+            left: item.left,
+            fontSize: item.size,
+            animationDelay: item.delay,
+            animationDuration: item.duration,
+          }}
+        >
+          {item.icon}
+        </div>
+      ))}
+
+      {/* Main Container Wrapper */}
+      <div style={{ width: '100%', maxWidth: '750px', display: 'grid', gap: '25px', boxSizing: 'border-box', zIndex: 5, marginTop: 'auto', marginBottom: 'auto' }}>
         
         {/* Core Header */}
         <div className="glass-panel" style={{ padding: '25px 20px', textAlign: 'center' }}>
@@ -304,7 +328,27 @@ export default function LmsConverter() {
 
       </div>
 
-      {/* Permanently Invisible DOM Layout Engine - Prevents Viewport Leaking */}
+      {/* Dynamic & Auto-Updating Footer Section */}
+      <footer style={{
+        width: '100%',
+        textAlign: 'center',
+        padding: '20px 0 10px 0',
+        color: '#6b7280',
+        fontSize: '12px',
+        fontFamily: 'sans-serif',
+        zIndex: 5,
+        borderTop: '1px solid rgba(255, 255, 255, 0.03)',
+        letterSpacing: '0.5px'
+      }}>
+        <p style={{ margin: 0, lineHeight: '1.6' }}>
+          &copy; {new Date().getFullYear()} <span style={{ color: '#818cf8', fontWeight: '600' }}>DIGI SOLUTIONS</span>. All Rights Reserved.
+        </p>
+        <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#4b5563' }}>
+          Developed by <span style={{ color: '#f472b6', fontWeight: '500' }}>Mr.Thanush</span>
+        </p>
+      </footer>
+
+      {/* Permanently Invisible DOM Layout Engine */}
       <div ref={hiddenRenderRef} style={{ 
         position: 'fixed', 
         top: '0', 
