@@ -5,24 +5,24 @@ import { renderAsync } from 'docx-preview';
 import html2canvas from 'html2canvas';
 
 export default function LmsConverter() {
-  // කුමන කොටසද ක්‍රියාත්මක විය යුත්තේ (Tab Control)
-  const [activeTab, setActiveTab] = useState('image'); // 'image', 'convert', 'compress'
-
-  // වෙන වෙනම ෆයිල් ලිස්ට් තබා ගැනීම (එකිනෙකට මිශ්‍ර නොවීමට)
+  // Separate states for each tool to prevent file mixing
   const [imageFiles, setImageFiles] = useState([]);
-  const [docFiles, setDocFiles] = useState([]);
+  const [wordFiles, setWordFiles] = useState([]);
   const [pdfFiles, setPdfFiles] = useState([]);
 
-  // පොදු Status සහ Loading States
+  // Process indicators
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [compressedSize, setCompressedSize] = useState(null);
 
-  const fileInputRef = useRef(null);
+  // Unique refs for each file selector
+  const imageInputRef = useRef(null);
+  const wordInputRef = useRef(null);
+  const pdfInputRef = useRef(null);
   const hiddenRenderRef = useRef(null);
 
-  // File Upload Handlers (වෙන වෙනම ටැබ් වලට ගැලපෙන සේ)
+  // File selection handlers
   const handleImageSelect = (e) => {
     const selected = Array.from(e.target.files).map(f => ({
       rawFile: f, name: f.name, size: (f.size / (1024 * 1024)).toFixed(2)
@@ -30,11 +30,11 @@ export default function LmsConverter() {
     setImageFiles([...imageFiles, ...selected]);
   };
 
-  const handleDocSelect = (e) => {
+  const handleWordSelect = (e) => {
     const selected = Array.from(e.target.files).map(f => ({
       rawFile: f, name: f.name, size: (f.size / (1024 * 1024)).toFixed(2)
     }));
-    setDocFiles([...docFiles, ...selected]);
+    setWordFiles([...wordFiles, ...selected]);
   };
 
   const handlePdfSelect = (e) => {
@@ -45,7 +45,6 @@ export default function LmsConverter() {
     setDownloadUrl(null);
   };
 
-  // Helper: File -> Base64
   const getBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -55,11 +54,11 @@ export default function LmsConverter() {
     });
   };
 
-  // 1. 📷 IMAGES TO PDF ENGINE
+  // 1. IMAGE & CAMERA TO PDF
   const processImagesToPdf = async () => {
-    if (imageFiles.length === 0) return alert("කරුණාකර පින්තූර එකතු කරන්න!");
+    if (imageFiles.length === 0) return alert("Please select or capture images first!");
     setLoading(true);
-    setStatusText("රූප රාමු PDF එකක් බවට සකසමින් පවතී...");
+    setStatusText("Generating high-fidelity PDF from images...");
     
     const pdf = new jsPDF('p', 'mm', 'a4');
     for (let i = 0; i < imageFiles.length; i++) {
@@ -72,10 +71,10 @@ export default function LmsConverter() {
     setStatusText("");
   };
 
-  // 2. 📝 WORD TO PDF ENGINE
-  const processOfficeToPdf = async (fileObj) => {
+  // 2. WORD TO PDF CONVERTER
+  const processWordToPdf = async (fileObj) => {
     setLoading(true);
-    setStatusText(`Layout එක සුරකිමින් '${fileObj.name}' PDF එකට හරවයි...`);
+    setStatusText(`Converting '${fileObj.name}' while preserving layout...`);
     try {
       const arrayBuffer = await fileObj.rawFile.arrayBuffer();
       if (hiddenRenderRef.current) {
@@ -92,16 +91,16 @@ export default function LmsConverter() {
         hiddenRenderRef.current.style.display = "none";
       }
     } catch (err) {
-      alert("පරිවර්තනය අසාර්ථකයි. කරුණාකර ෆයිල් එක පරීක්ෂා කරන්න.");
+      alert("Conversion failed. Please verify the document format.");
     }
     setLoading(false);
     setStatusText("");
   };
 
-  // 3. 🗜️ PDF COMPRESSION ENGINE
+  // 3. PDF COMPRESSION
   const processPdfCompression = async (fileObj) => {
     setLoading(true);
-    setStatusText("විශාල PDF ගොනුව 2MB සීමාවට Compress කරමින් පවතී...");
+    setStatusText("Compressing PDF elements down to target size...");
     try {
       const fileBytes = await fileObj.rawFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(fileBytes);
@@ -110,157 +109,142 @@ export default function LmsConverter() {
       const blob = new Blob([compressedBytes], { type: 'application/pdf' });
       setCompressedSize((blob.size / (1024 * 1024)).toFixed(2));
       setDownloadUrl(URL.createObjectURL(blob));
-      setStatusText("Compress කිරීම සාර්ථකයි!");
+      setStatusText("Compression successful!");
     } catch (error) {
-      alert("PDF Compress කිරීම අසාර්ථකයි: " + error.message);
+      alert("PDF Compression failed: " + error.message);
     }
     setLoading(false);
   };
 
   return (
-    <div className="glass-panel" style={{ width: '100%', maxWidth: '700px', padding: '35px', boxSizing: 'border-box', position: 'relative' }}>
+    <div style={{ width: '100%', maxWidth: '800px', display: 'grid', gap: '30px', boxSizing: 'border-box' }}>
       
-      {/* Background Neon Glow Decorations */}
-      <div style={{ position: 'absolute', top: '-5%', left: '-5%', width: '180px', height: '180px', background: '#4f46e5', filter: 'blur(100px)', borderRadius: '50%', zIndex: -1 }}></div>
-      <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: '180px', height: '180px', background: '#db2777', filter: 'blur(100px)', borderRadius: '50%', zIndex: -1 }}></div>
-
-      <h1 style={{ margin: '0 0 5px 0', textAlign: 'center', fontSize: '26px', fontWeight: '700', background: 'linear-gradient(to right, #a5b4fc, #818cf8, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-        LMS Advanced Core Tool
-      </h1>
-      <p style={{ margin: '0 0 25px 0', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
-        ඔයාට අවශ්‍ය පහසුකම වෙන වෙනම තෝරාගෙන වැඩේ කරගන්න මචං
-      </p>
-
-      {/* Premium Tab Navigation Navigation System */}
-      <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', padding: '6px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '30px', gap: '5px' }}>
-        <button 
-          onClick={() => { setActiveTab('image'); setDownloadUrl(null); }}
-          style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: activeTab === 'image' ? 'linear-gradient(135deg, #4f46e5, #6366f1)' : 'transparent', color: activeTab === 'image' ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s' }}
-        >
-          📷 Image to PDF
-        </button>
-        <button 
-          onClick={() => { setActiveTab('convert'); setDownloadUrl(null); }}
-          style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: activeTab === 'convert' ? 'linear-gradient(135deg, #2563eb, #3b82f6)' : 'transparent', color: activeTab === 'convert' ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s' }}
-        >
-          📝 Doc Converter
-        </button>
-        <button 
-          onClick={() => { setActiveTab('compress'); setDownloadUrl(null); }}
-          style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: activeTab === 'compress' ? 'linear-gradient(135deg, #059669, #10b981)' : 'transparent', color: activeTab === 'compress' ? '#fff' : '#9ca3af', fontWeight: '600', fontSize: '13px', transition: 'all 0.2s' }}
-        >
-          🗜️ Compress PDF
-        </button>
+      {/* Header Panel */}
+      <div className="glass-panel" style={{ padding: '30px', textAlign: 'center' }}>
+        <h1 style={{ margin: '0 0 5px 0', fontSize: '28px', fontWeight: '700', background: 'linear-gradient(to right, #a5b4fc, #818cf8, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+          LMS Central PDF Toolkit
+        </h1>
+        <p style={{ margin: 0, color: '#9ca3af', fontSize: '14px' }}>
+          Professional student utility hub for seamless file conversions and optimizations
+        </p>
       </div>
 
-      {/* Dynamic Content Sections based on Active Tab */}
-      
-      {/* TAB 1: IMAGE & CAMERA TO PDF */}
-      {activeTab === 'image' && (
-        <div>
-          <div onClick={() => fileInputRef.current.click()} style={{ border: '2px dashed rgba(99, 102, 241, 0.4)', borderRadius: '16px', padding: '35px 20px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>📸</div>
-            <h4 style={{ margin: '0 0 5px 0', color: '#e0e7ff' }}>කැමරාවෙන් Photo ගන්න හෝ Images දමන්න</h4>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>Supports JPG, PNG, WEBP (Direct Mobile Camera support)</span>
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple accept="image/*" capture="environment" onChange={handleImageSelect} />
-          </div>
-
-          {imageFiles.length > 0 && (
-            <div style={{ marginTop: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px' }}>
-                <span>තෝරාගත් පින්තූර ({imageFiles.length})</span>
-                <span onClick={() => setImageFiles([])} style={{ color: '#f87171', cursor: 'pointer' }}>සියල්ල අයින් කරන්න</span>
-              </div>
-              <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'grid', gap: '5px' }}>
-                {imageFiles.map((f, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '12px' }}>
-                    <span>📷 {f.name}</span> <span>{f.size} MB</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={processImagesToPdf} disabled={loading} style={{ width: '100%', marginTop: '20px', padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(90deg, #4f46e5, #6366f1)', color: 'white', fontWeight: '600' }}>
-                {loading ? "PDF එක සකසමින්..." : "📷 සියලුම පින්තූර PDF එකක් කරන්න"}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: DOCUMENT CONVERTER */}
-      {activeTab === 'convert' && (
-        <div>
-          <div onClick={() => fileInputRef.current.click()} style={{ border: '2px dashed rgba(59, 130, 246, 0.4)', borderRadius: '16px', padding: '35px 20px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>📄</div>
-            <h4 style={{ margin: '0 0 5px 0', color: '#e0e7ff' }}>Word (.docx) ෆයිල් එකක් මෙතනට දමන්න</h4>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>කිසිම Layout එකක් වෙනස් නොවී 100% නිවැරදිව PDF වේ</span>
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept=".docx" onChange={handleDocSelect} />
-          </div>
-
-          {docFiles.length > 0 && (
-            <div style={{ marginTop: '20px' }}>
-              {docFiles.map((f, idx) => (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span>📝 {f.name}</span> <strong>{f.size} MB</strong>
-                  </div>
-                  <button onClick={() => processOfficeToPdf(f)} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: '600' }}>
-                    {loading ? "පරිවර්තනය වෙමින් පවතී..." : "පිටු සැකසුම සුරකිමින් PDF කරන්න"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: PDF COMPRESSOR */}
-      {activeTab === 'compress' && (
-        <div>
-          <div onClick={() => fileInputRef.current.click()} style={{ border: '2px dashed rgba(16, 185, 129, 0.4)', borderRadius: '16px', padding: '35px 20px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🗜️</div>
-            <h4 style={{ margin: '0 0 5px 0', color: '#e0e7ff' }}>ධාරිතාවය (Size) අඩු කිරීමට අවශ්‍ය PDF එක දමන්න</h4>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>20MB වැනි විශාල ෆයිල්ස් ලේසියෙන්ම 2MB සීමාවට බස්සයි</span>
-            <input type="file" ref={fileInputRef} style={{ display: 'none' }} accept="application/pdf" onChange={handlePdfSelect} />
-          </div>
-
-          {pdfFiles.length > 0 && (
-            <div style={{ marginTop: '20px' }}>
-              {pdfFiles.map((f, idx) => (
-                <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                    <span>📕 {f.name}</span> <strong>{f.size} MB</strong>
-                  </div>
-                  {!downloadUrl && (
-                    <button onClick={() => processPdfCompression(f)} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#059669', color: 'white', fontWeight: '600' }}>
-                      {loading ? "High-Intensity Compress සිදුවේ..." : "High Compress (20MB -> 2MB)"}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Loading Status Indicator */}
+      {/* Global Processing Loader */}
       {loading && (
-        <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <div style={{ width: '16px', height: '16px', border: '2px solid transparent', borderTopColor: '#818cf8', borderRadius: '50%', animation: 'gradientBG 1s linear infinite' }}></div>
-          <span style={{ fontSize: '13px', color: '#c7d2fe' }}>{statusText}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', padding: '16px', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '16px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+          <div style={{ width: '18px', height: '18px', border: '2px solid transparent', borderTopColor: '#f472b6', borderRadius: '50%', animation: 'gradientBG 1s linear infinite' }}></div>
+          <span style={{ fontSize: '14px', color: '#e0e7ff', fontWeight: '500' }}>{statusText}</span>
         </div>
       )}
 
-      {/* Download Result Panel */}
-      {downloadUrl && (
-        <div style={{ marginTop: '25px', padding: '20px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
-          <p style={{ margin: '0 0 10px 0', color: '#34d399', fontSize: '13px', fontWeight: '600' }}>🎉 සාර්ථකයි! නව PDF ගොනු ප්‍රමාණය: {compressedSize} MB</p>
-          <a href={downloadUrl} download="LMS_Optimized_Document.pdf" style={{ display: 'inline-block', padding: '10px 20px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '13px' }}>
-            📥 බාගත කරගන්න (Download PDF)
-          </a>
+      {/* SECTION 1: IMAGE & CAMERA TO PDF */}
+      <div className="glass-panel" style={{ padding: '30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <span style={{ fontSize: '24px' }}>📷</span>
+          <h2 style={{ margin: 0, fontSize: '18px', color: '#fff' }}>Image & Camera to PDF Converter</h2>
         </div>
-      )}
+        
+        <div onClick={() => imageInputRef.current.click()} style={{ border: '2px dashed rgba(99, 102, 241, 0.3)', borderRadius: '14px', padding: '30px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
+          <p style={{ margin: '0 0 5px 0', color: '#c7d2fe', fontSize: '14px', fontWeight: '600' }}>Click to capture or upload images</p>
+          <span style={{ fontSize: '11px', color: '#6b7280' }}>Supports JPG, PNG, WEBP (Launches mobile camera directly)</span>
+          <input type="file" ref={imageInputRef} style={{ display: 'none' }} multiple accept="image/*" capture="environment" onChange={handleImageSelect} />
+        </div>
 
-      {/* Sandbox Container for PDF Generation */}
+        {imageFiles.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: '#9ca3af' }}>
+              <span>Selected Images ({imageFiles.length})</span>
+              <span onClick={() => setImageFiles([])} style={{ color: '#f87171', cursor: 'pointer', fontWeight: '600' }}>Clear All</span>
+            </div>
+            <div style={{ maxHeight: '120px', overflowY: 'auto', display: 'grid', gap: '6px' }}>
+              {imageFiles.map((f, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span>📷 {f.name}</span> <span style={{ color: '#a1a1aa' }}>{f.size} MB</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={processImagesToPdf} disabled={loading} style={{ width: '100%', marginTop: '15px', padding: '14px', borderRadius: '12px', border: 'none', background: 'linear-gradient(90deg, #4f46e5, #6366f1)', color: 'white', fontWeight: '600', fontSize: '14px' }}>
+              Generate Document PDF
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 2: DOCUMENT CONVERTER */}
+      <div className="glass-panel" style={{ padding: '30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <span style={{ fontSize: '24px' }}>📝</span>
+          <h2 style={{ margin: 0, fontSize: '18px', color: '#fff' }}>Office Document to PDF Converter</h2>
+        </div>
+
+        <div onClick={() => wordInputRef.current.click()} style={{ border: '2px dashed rgba(59, 130, 246, 0.3)', borderRadius: '14px', padding: '30px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
+          <p style={{ margin: '0 0 5px 0', color: '#9bf6ff', fontSize: '14px', fontWeight: '600' }}>Click to upload Word document</p>
+          <span style={{ fontSize: '11px', color: '#6b7280' }}>Converts Word (.docx) files accurately with layout protection</span>
+          <input type="file" ref={wordInputRef} style={{ display: 'none' }} accept=".docx" onChange={handleWordSelect} />
+        </div>
+
+        {wordFiles.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '8px', color: '#9ca3af' }}>
+              <span>Queue</span>
+              <span onClick={() => setWordFiles([])} style={{ color: '#f87171', cursor: 'pointer', fontWeight: '600' }}>Remove</span>
+            </div>
+            {wordFiles.map((f, idx) => (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span>📄 {f.name}</span> <strong>{f.size} MB</strong>
+                </div>
+                <button onClick={() => processWordToPdf(f)} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#2563eb', color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                  Convert and Save PDF
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: PDF COMPRESSOR */}
+      <div className="glass-panel" style={{ padding: '30px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <span style={{ fontSize: '24px' }}>🗜️</span>
+          <h2 style={{ margin: 0, fontSize: '18px', color: '#fff' }}>High-Intensity PDF Compressor</h2>
+        </div>
+
+        <div onClick={() => pdfInputRef.current.click()} style={{ border: '2px dashed rgba(16, 185, 129, 0.3)', borderRadius: '14px', padding: '30px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
+          <p style={{ margin: '0 0 5px 0', color: '#a7f3d0', fontSize: '14px', fontWeight: '600' }}>Click to upload target PDF</p>
+          <span style={{ fontSize: '11px', color: '#6b7280' }}>Optimizes data streams to shrink 20MB files down to 2MB limits</span>
+          <input type="file" ref={pdfInputRef} style={{ display: 'none' }} accept="application/pdf" onChange={handlePdfSelect} />
+        </div>
+
+        {pdfFiles.length > 0 && (
+          <div style={{ marginTop: '20px' }}>
+            {pdfFiles.map((f, idx) => (
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                  <span>📕 {f.name}</span> <strong>{f.size} MB</strong>
+                </div>
+                {!downloadUrl && (
+                  <button onClick={() => processPdfCompression(f)} disabled={loading} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: '#059669', color: 'white', fontWeight: '600', fontSize: '13px' }}>
+                    Compress PDF Structure
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Compression Result Output Panel */}
+        {downloadUrl && (
+          <div style={{ marginTop: '20px', padding: '20px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
+            <p style={{ margin: '0 0 12px 0', color: '#34d399', fontSize: '13px', fontWeight: '600' }}>Optimization Completed! New Size: {compressedSize} MB</p>
+            <a href={downloadUrl} download="LMS_Compressed_Document.pdf" style={{ display: 'inline-block', padding: '10px 24px', background: '#10b981', color: 'white', textDecoration: 'none', borderRadius: '8px', fontWeight: '600', fontSize: '13px' }}>
+              Download Optimized PDF
+            </a>
+          </div>
+        )}
+      </div>
+
+      {/* Hidden DOM layout buffer for pixel-perfect conversions */}
       <div ref={hiddenRenderRef} style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', background: 'white', color: 'black', padding: '20px', boxSizing: 'border-box' }}></div>
     </div>
   );
