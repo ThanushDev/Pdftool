@@ -5,8 +5,9 @@ import { renderAsync } from 'docx-preview';
 import html2canvas from 'html2canvas';
 
 export default function LmsConverter() {
-  // Separate states for each feature tool
-  const [imageFiles, setImageFiles] = useState([]);
+  // Separate states for each unique tool to avoid file conflicts
+  const [cameraFiles, setCameraFiles] = useState([]);
+  const [galleryFiles, setGalleryFiles] = useState([]);
   const [wordFiles, setWordFiles] = useState([]);
   const [pdfFiles, setPdfFiles] = useState([]);
 
@@ -16,13 +17,14 @@ export default function LmsConverter() {
   const [downloadUrl, setDownloadUrl] = useState(null);
   const [compressedSize, setCompressedSize] = useState(null);
 
-  // Layout refs
-  const imageInputRef = useRef(null);
+  // Layout input references
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
   const wordInputRef = useRef(null);
   const pdfInputRef = useRef(null);
   const hiddenRenderRef = useRef(null);
 
-  // Define static array for floating background icons to avoid re-render shifting
+  // Animated floating background icons configuration
   const backgroundIcons = [
     { icon: '📄', top: '10%', left: '5%', size: '32px', delay: '0s', duration: '15s' },
     { icon: '📕', top: '25%', left: '85%', size: '28px', delay: '2s', duration: '18s' },
@@ -36,12 +38,19 @@ export default function LmsConverter() {
     { icon: '📝', top: '5%', left: '45%', size: '30px', delay: '7s', duration: '21s' },
   ];
 
-  // Selection Logic
-  const handleImageSelect = (e) => {
+  // Selection Logics
+  const handleCameraSelect = (e) => {
     const selected = Array.from(e.target.files).map(f => ({
       rawFile: f, name: f.name, size: (f.size / (1024 * 1024)).toFixed(2)
     }));
-    setImageFiles([...imageFiles, ...selected]);
+    setCameraFiles([...cameraFiles, ...selected]);
+  };
+
+  const handleGallerySelect = (e) => {
+    const selected = Array.from(e.target.files).map(f => ({
+      rawFile: f, name: f.name, size: (f.size / (1024 * 1024)).toFixed(2)
+    }));
+    setGalleryFiles([...galleryFiles, ...selected]);
   };
 
   const handleWordSelect = (e) => {
@@ -68,17 +77,17 @@ export default function LmsConverter() {
     });
   };
 
-  // 1. IMAGE TO PDF ENGINE (WITH ASPECT RATIO PROTECTION)
-  const processImagesToPdf = async () => {
-    if (imageFiles.length === 0) return alert("Please select or capture images first!");
+  // REUSABLE IMAGE-TO-PDF GENERATION LOGIC
+  const generatePdfFromImages = async (filesArray, outputName) => {
+    if (filesArray.length === 0) return alert("Please add images first!");
     setLoading(true);
-    setStatusText("Generating aspect-ratio preserved PDF from images...");
+    setStatusText("Generating aspect-ratio preserved PDF...");
     
     const pdf = new jsPDF('p', 'mm', 'a4');
     
-    for (let i = 0; i < imageFiles.length; i++) {
+    for (let i = 0; i < filesArray.length; i++) {
       if (i > 0) pdf.addPage();
-      const base64 = await getBase64(imageFiles[i].rawFile);
+      const base64 = await getBase64(filesArray[i].rawFile);
       
       const img = new Image();
       img.src = base64;
@@ -100,12 +109,12 @@ export default function LmsConverter() {
       pdf.addImage(base64, 'JPEG', xOffset, yOffset, imgWidth, imgHeight, undefined, 'FAST');
     }
     
-    pdf.save("LMS-Camera-Images.pdf");
+    pdf.save(outputName);
     setLoading(false);
     setStatusText("");
   };
 
-  // 2. WORD TO PDF CONVERTER
+  // 3. WORD TO PDF CONVERTER ENGINE
   const processWordToPdf = async (fileObj) => {
     setLoading(true);
     setStatusText(`Processing document architecture for '${fileObj.name}'...`);
@@ -132,7 +141,7 @@ export default function LmsConverter() {
     setStatusText("");
   };
 
-  // 3. HIGH-INTENSITY PDF COMPRESSION
+  // 4. HIGH-INTENSITY PDF COMPRESSION ENGINE
   const processPdfCompression = async (fileObj) => {
     setLoading(true);
     setStatusText("Optimizing data structures to meet 2MB submission limit...");
@@ -166,7 +175,7 @@ export default function LmsConverter() {
       overflowX: 'hidden'
     }}>
       
-      {/* Dynamic CSS Injection for Floating Animations */}
+      {/* CSS Injection Layer for Floating Background Elements */}
       <style>{`
         @keyframes floatAndDrift {
           0% { transform: translateY(0px) translateX(0px) rotate(0deg); opacity: 0.15; }
@@ -182,7 +191,7 @@ export default function LmsConverter() {
         }
       `}</style>
 
-      {/* Floating Background Icons Layer */}
+      {/* Background Floating Canvas */}
       {backgroundIcons.map((item, idx) => (
         <div
           key={idx}
@@ -199,10 +208,10 @@ export default function LmsConverter() {
         </div>
       ))}
 
-      {/* Main Container Wrapper */}
+      {/* Responsive Central Content Shell */}
       <div style={{ width: '100%', maxWidth: '750px', display: 'grid', gap: '25px', boxSizing: 'border-box', zIndex: 5, marginTop: 'auto', marginBottom: 'auto' }}>
         
-        {/* Core Header */}
+        {/* Core Identity Banner */}
         <div className="glass-panel" style={{ padding: '25px 20px', textAlign: 'center' }}>
           <h1 style={{ margin: '0 0 6px 0', fontSize: 'calc(20px + 1vw)', fontWeight: '700', background: 'linear-gradient(to right, #a5b4fc, #818cf8, #f472b6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             LMS Central PDF Toolkit
@@ -212,7 +221,7 @@ export default function LmsConverter() {
           </p>
         </div>
 
-        {/* Global Loading Bar */}
+        {/* System Operations Loader */}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', padding: '14px', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '14px', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
             <div style={{ width: '16px', height: '16px', border: '2px solid transparent', borderTopColor: '#f472b6', borderRadius: '50%', animation: 'gradientBG 1s linear infinite' }}></div>
@@ -220,41 +229,75 @@ export default function LmsConverter() {
           </div>
         )}
 
-        {/* MODULE 1: IMAGE TO PDF */}
+        {/* MODULE 1: DIRECT CAMERA TO PDF */}
         <div className="glass-panel" style={{ padding: '25px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
             <span style={{ fontSize: '22px' }}>📷</span>
-            <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: '600' }}>Image & Camera to PDF Converter</h2>
+            <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: '600' }}>Direct Mobile Camera to PDF</h2>
           </div>
           
-          <div onClick={() => imageInputRef.current.click()} style={{ border: '2px dashed rgba(99, 102, 241, 0.25)', borderRadius: '12px', padding: '25px 15px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
-            <p style={{ margin: '0 0 4px 0', color: '#c7d2fe', fontSize: '13px', fontWeight: '600' }}>Click to capture or upload images</p>
-            <span style={{ fontSize: '11px', color: '#6b7280' }}>Supports JPG, PNG, WEBP (Direct Mobile Camera sync)</span>
-            <input type="file" ref={imageInputRef} style={{ display: 'none' }} multiple accept="image/*" capture="environment" onChange={handleImageSelect} />
+          <div onClick={() => cameraInputRef.current.click()} style={{ border: '2px dashed rgba(244, 114, 182, 0.25)', borderRadius: '12px', padding: '25px 15px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
+            <p style={{ margin: '0 0 4px 0', color: '#fbcfe8', fontSize: '13px', fontWeight: '600' }}>Tap to launch device camera</p>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>Forces system camera execution to capture pages sequentially</span>
+            <input type="file" ref={cameraInputRef} style={{ display: 'none' }} accept="image/*" capture="environment" onChange={handleCameraSelect} />
           </div>
 
-          {imageFiles.length > 0 && (
+          {cameraFiles.length > 0 && (
             <div style={{ marginTop: '15px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px', color: '#9ca3af' }}>
-                <span>Queue ({imageFiles.length})</span>
-                <span onClick={() => setImageFiles([])} style={{ color: '#f87171', cursor: 'pointer', fontWeight: '600' }}>Clear</span>
+                <span>Captured Frames ({cameraFiles.length})</span>
+                <span onClick={() => setCameraFiles([])} style={{ color: '#f87171', cursor: 'pointer', fontWeight: '600' }}>Clear</span>
               </div>
               <div style={{ maxHeight: '110px', overflowY: 'auto', display: 'grid', gap: '5px' }}>
-                {imageFiles.map((f, idx) => (
+                {cameraFiles.map((f, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
-                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '75%' }}>📷 {f.name}</span>
+                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '75%' }}>📷 Snap_{idx + 1}.jpg</span>
                     <span style={{ color: '#a1a1aa', fontSize: '11px' }}>{f.size} MB</span>
                   </div>
                 ))}
               </div>
-              <button onClick={processImagesToPdf} disabled={loading} style={{ width: '100%', marginTop: '12px', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(90deg, #4f46e5, #6366f1)', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
-                Generate Document PDF
+              <button onClick={() => generatePdfFromImages(cameraFiles, "LMS-Camera-Capture.pdf")} disabled={loading} style={{ width: '100%', marginTop: '12px', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(90deg, #ec4899, #f43f5e)', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+                Compile Camera Snaps to PDF
               </button>
             </div>
           )}
         </div>
 
-        {/* MODULE 2: WORD CONVERTER */}
+        {/* MODULE 2: GALLERY IMAGES TO PDF */}
+        <div className="glass-panel" style={{ padding: '25px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
+            <span style={{ fontSize: '22px' }}>🖼️</span>
+            <h2 style={{ margin: 0, fontSize: '16px', color: '#fff', fontWeight: '600' }}>Local Gallery Images to PDF</h2>
+          </div>
+          
+          <div onClick={() => galleryInputRef.current.click()} style={{ border: '2px dashed rgba(99, 102, 241, 0.25)', borderRadius: '12px', padding: '25px 15px', textAlign: 'center', cursor: 'pointer', background: 'rgba(255,255,255,0.01)' }}>
+            <p style={{ margin: '0 0 4px 0', color: '#c7d2fe', fontSize: '13px', fontWeight: '600' }}>Click to browse phone gallery</p>
+            <span style={{ fontSize: '11px', color: '#6b7280' }}>Select multiple pre-existing photos from device storage</span>
+            <input type="file" ref={galleryInputRef} style={{ display: 'none' }} multiple accept="image/*" onChange={handleGallerySelect} />
+          </div>
+
+          {galleryFiles.length > 0 && (
+            <div style={{ marginTop: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px', color: '#9ca3af' }}>
+                <span>Selected Images ({galleryFiles.length})</span>
+                <span onClick={() => setGalleryFiles([])} style={{ color: '#f87171', cursor: 'pointer', fontWeight: '600' }}>Clear</span>
+              </div>
+              <div style={{ maxHeight: '110px', overflowY: 'auto', display: 'grid', gap: '5px' }}>
+                {galleryFiles.map((f, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.03)' }}>
+                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '75%' }}>🖼️ {f.name}</span>
+                    <span style={{ color: '#a1a1aa', fontSize: '11px' }}>{f.size} MB</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => generatePdfFromImages(galleryFiles, "LMS-Gallery-Docs.pdf")} disabled={loading} style={{ width: '100%', marginTop: '12px', padding: '12px', borderRadius: '10px', border: 'none', background: 'linear-gradient(90deg, #4f46e5, #6366f1)', color: 'white', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+                Compile Gallery Images to PDF
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* MODULE 3: WORD CONVERTER */}
         <div className="glass-panel" style={{ padding: '25px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
             <span style={{ fontSize: '22px' }}>📝</span>
@@ -284,7 +327,7 @@ export default function LmsConverter() {
           )}
         </div>
 
-        {/* MODULE 3: PDF COMPRESSOR */}
+        {/* MODULE 4: PDF COMPRESSOR */}
         <div className="glass-panel" style={{ padding: '25px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '18px' }}>
             <span style={{ fontSize: '22px' }}>🗜️</span>
@@ -315,7 +358,7 @@ export default function LmsConverter() {
             </div>
           )}
 
-          {/* Download Dashboard */}
+          {/* Download Output Station */}
           {downloadUrl && (
             <div style={{ marginTop: '15px', padding: '15px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
               <p style={{ margin: '0 0 10px 0', color: '#34d399', fontSize: '12px', fontWeight: '600' }}>Optimization Completed! New Size: {compressedSize} MB</p>
@@ -328,7 +371,7 @@ export default function LmsConverter() {
 
       </div>
 
-      {/* Dynamic & Auto-Updating Footer Section */}
+      {/* Dynamic & Self-Updating Branding Footer */}
       <footer style={{
         width: '100%',
         textAlign: 'center',
@@ -344,11 +387,11 @@ export default function LmsConverter() {
           &copy; {new Date().getFullYear()} <span style={{ color: '#818cf8', fontWeight: '600' }}>DIGI SOLUTIONS</span>. All Rights Reserved.
         </p>
         <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#4b5563' }}>
-          Developed by <span style={{ color: '#f472b6', fontWeight: '500' }}>Mr.Thanush</span>
+          Designed & Developed by <span style={{ color: '#f472b6', fontWeight: '500' }}>Mr.Thanush</span>
         </p>
       </footer>
 
-      {/* Permanently Invisible DOM Layout Engine */}
+      {/* Permanently Invisible Isolated DOM Pipeline for Layout Mapping */}
       <div ref={hiddenRenderRef} style={{ 
         position: 'fixed', 
         top: '0', 
